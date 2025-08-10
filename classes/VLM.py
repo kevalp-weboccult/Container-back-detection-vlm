@@ -194,7 +194,8 @@ class VLMProcessor:
                         
                         if output:
                             image_save_path = os.path.join(self.PROCESSSED_IMAGE_FOLDER, image_name + ".jpg")
-                            cv2.imwrite(os.path.join(self.PROCESSSED_IMAGE_FOLDER, image_save_path), image)
+                            self.logger.info(f"Saving processed image to {image_save_path}")
+                            cv2.imwrite(image_save_path, image)
                             self.parse_and_save_output(output, filename=json_filename, save_folder=self.PROCESSSED_IMAGE_FOLDER)
                     else:
                         self.logger.error(f"Failed to read image: {image_path}")
