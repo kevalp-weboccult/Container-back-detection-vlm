@@ -1,0 +1,6 @@
+*.json
+*.mp4
+*.log
+*.pt
+*.onnx
+__pycache__/
