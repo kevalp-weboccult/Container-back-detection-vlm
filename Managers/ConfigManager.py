@@ -79,8 +79,11 @@ class ConfigManager:
             'YOLO_MODEL_PATH':"yolov8n.pt",
             "CAMERA_URLS": [],
             "CAMERA_URL":"20250731_173123.mp4",
-            "Capture_save_folder":"Processed_Images",
+            "BACK_IMAGE_FOLDER":"Back_Images",
             "MIN_IMAGE_SIZE":100,
+            "USE_FFMPEG":True,
+            "PROCESSSED_IMAGE_FOLDER":"Processed_Data",
+
         }
         
         self.private: Dict[str, Optional[str]] = {

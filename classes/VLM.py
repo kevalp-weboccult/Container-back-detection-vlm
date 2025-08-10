@@ -16,6 +16,9 @@ import numpy as np
 import PIL
 import numpy as np
 import time
+import re
+import json
+from glob import glob
 
 class VLMProcessor:
     def __init__(self, name: str = "vlm_processor") -> None:
@@ -35,6 +38,10 @@ class VLMProcessor:
                 log_to_console=self.config_manager.get("LOG_TO_CONSOLE"),
             )
             self.model_name = "unsloth/Qwen2.5-VL-3B-Instruct-unsloth-bnb-4bit"
+            self.running: bool = True
+            self.PROCESSSED_IMAGE_FOLDER = self.config_manager.get("PROCESSSED_IMAGE_FOLDER", "Processed_Data")
+            if not os.path.exists(self.PROCESSSED_IMAGE_FOLDER):
+                os.makedirs(self.PROCESSSED_IMAGE_FOLDER)
 
             # default: Load the model on the available device(s)
             self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
@@ -42,6 +49,7 @@ class VLMProcessor:
             )
             self.min_pixels = 256*28*28
             self.max_pixels = 1024*28*28
+            self.BACK_IMAGE_FOLDER = self.config_manager.get("BACK_IMAGE_FOLDER", "Back_Images")
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self.processor = AutoProcessor.from_pretrained(self.model_name, min_pixels=self.min_pixels, max_pixels=self.max_pixels)
             self.prompt ="""Act like a highly accurate optical character recognition (OCR) model specialized in extracting container logistics metadata. Your task is to analyze the provided image or text content and return all relevant shipping container metadata in a well-structured JSON format.
@@ -79,6 +87,32 @@ class VLMProcessor:
         except Exception as e:
             print(f"Error initializing VLMProcessor: {e} | {traceback.format_exc()}")
     
+    def parse_and_save_output(self,output_text, filename="container_output.json",save_folder="Processed_Data"):
+        """
+        Parse the VLM output and save as JSON file
+        """
+        # Extract JSON from the markdown-wrapped output
+        json_match = re.search(r'```json\n(.*?)\n```', output_text[0], re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+            try:
+                # Parse the JSON to validate it
+                parsed_json = json.loads(json_str)
+                # Save to file
+                file_path = os.path.join(save_folder, filename)
+                with open(file_path, 'w') as f:
+                    json.dump(parsed_json, f, indent=2)
+                self.logger.info(f"JSON saved to {file_path}")
+                return parsed_json
+            except json.JSONDecodeError as e:
+                # print(f"Error parsing JSON: {e}")
+                self.logger.error(f"Error parsing JSON: {e}")
+                return None
+        else:
+            # print("No JSON found in output")
+            self.logger.warning("No JSON found in output")
+            return None
+        
     def  predict(self,image:np.ndarray):
         try:
             if image is None or not isinstance(image, np.ndarray):
@@ -141,6 +175,33 @@ class VLMProcessor:
         except Exception as e:
             self.logger.error(f"Error in predict method: {e} | {traceback.format_exc()}")
             return None
+    
+    def start(self):
+        while self.running:
+            try:
+                images = glob(os.path.join(self.BACK_IMAGE_FOLDER, "*.jpg"))
+                if len(images) == 0:
+                    self.logger.info("No images found in the BACK_IMAGE_FOLDER.")
+                    time.sleep(5)
+                    continue
+                for image_path in images:
+                    self.logger.info(f"Processing image: {image_path}")
+                    image = cv2.imread(image_path)
+                    if image is not None:
+                        output = self.predict(image)
+                        image_name = os.path.basename(image_path).split('.')[0]
+                        json_filename = f"{image_name}_output.json"
+                        
+                        if output:
+                            image_save_path = os.path.join(self.PROCESSSED_IMAGE_FOLDER, image_name + ".jpg")
+                            cv2.imwrite(os.path.join(self.PROCESSSED_IMAGE_FOLDER, image_save_path), image)
+                            self.parse_and_save_output(output, filename=json_filename, save_folder=self.PROCESSSED_IMAGE_FOLDER)
+                    else:
+                        self.logger.error(f"Failed to read image: {image_path}")
+                
+            except Exception as e:
+                self.logger.error(f"Error in VLMProcessor loop: {e} | {traceback.format_exc()}")
+                time.sleep(1)
 
 if __name__ == "__main__":
     vlm_processor = VLMProcessor()

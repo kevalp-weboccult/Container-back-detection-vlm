@@ -93,8 +93,8 @@ class BackObject:
             if len(self.bboxes) > 20:
                 self.bboxes.pop(0)
             self.bboxes.append(bbox)
-            
-            frame_size: Tuple[int, int] = (frame.shape[0], frame.shape[1])
+            cropped_frame = frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
+            frame_size: Tuple[int, int] = (cropped_frame.shape[0], cropped_frame.shape[1])
             
             is_valid_size = (frame_size[0] > self.MIN_IMAGE_SIZE and 
                            frame_size[1] > self.MIN_IMAGE_SIZE and 
@@ -106,7 +106,7 @@ class BackObject:
                             frame_size[1] > self.best_frame_size[1]))
             
             if is_valid_size and should_update:
-                self.best_frame = frame
+                self.best_frame = cropped_frame
                 self.best_frame_size = frame_size
                 self.best_conf = conf
                 self.best_bbox = bbox

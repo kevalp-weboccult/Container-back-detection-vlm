@@ -5,6 +5,8 @@ import torch
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 from qwen_vl_utils import process_vision_info
 import PIL
+import re
+import json
 model_name = "unsloth/Qwen2.5-VL-3B-Instruct-unsloth-bnb-4bit"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # default: Load the model on the available device(s)
@@ -65,6 +67,29 @@ Ensure the final response is formatted like this:
 """
 
 
+def parse_and_save_output(output_text, filename="container_output.json"):
+    """
+    Parse the VLM output and save as JSON file
+    """
+    # Extract JSON from the markdown-wrapped output
+    json_match = re.search(r'```json\n(.*?)\n```', output_text[0], re.DOTALL)
+    if json_match:
+        json_str = json_match.group(1)
+        try:
+            # Parse the JSON to validate it
+            parsed_json = json.loads(json_str)
+            # Save to file
+            with open(filename, 'w') as f:
+                json.dump(parsed_json, f, indent=2)
+            print(f"JSON saved to {filename}")
+            return parsed_json
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON: {e}")
+            return None
+    else:
+        print("No JSON found in output")
+        return None
+
 def get_caption(image_path):
     image = cv2.imread(image_path)
     #convert the image to RGB format
@@ -114,13 +139,14 @@ def get_caption(image_path):
 
 # folder_path = "raw_images/"
 # all_images = os.listdir(folder_path)
-all_images = ['C5.png']
+all_images = ['Processed_Images/20250810_200933_1.jpg']
 for image_path in all_images:
     # print(image_path)
     # complete_image_path = os.path.join(folder_path,image_path)
     complete_image_path = image_path
     # print(complete_image_path)
     caption = get_caption(complete_image_path)
+    parse_and_save_output(caption, filename="container_output.json")
     print("Caption:")
     print(caption)
     # img = cv2.imread(complete_image_path)

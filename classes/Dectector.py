@@ -17,7 +17,7 @@ from Modules.CustomLogger import CustomLogger
 from ultralytics import YOLO
 from queue import Queue
 import logging
-
+import torch
 
 class Detector:
     def __init__(self, name: str = "detector", yolo_model: Optional[str] = None) -> None:
@@ -44,7 +44,7 @@ class Detector:
             
             self.model: YOLO = YOLO(self.yolo_model)
             self.running: bool = True
-            self.writer_queue: Queue[Dict[str, Any]] = Queue(maxsize=1)
+            self.writer_queue: Queue[Dict[str, Any]] = Queue(maxsize=10)
             self.reader_queue: Optional[Queue[Dict[str, Any]]] = None
             
             # Configuration parameters with type hints
@@ -52,11 +52,24 @@ class Detector:
             self.is_live: bool = self.config_manager.get("IS_LIVE", True)
             self.confidence: float = self.config_manager.get("CONFIDENCE", 0.5)
             self.iou: float = self.config_manager.get("IOU", 0.45)
+            self.device:str  = "cuda" if torch.cuda.is_available() else "cpu"
             
             self.inference_frame: Optional[np.ndarray] = None
+            self.warmup()  # Warm up the model
         
         except Exception as e:
             print(f"Error initializing Detector: {e} | {traceback.format_exc()}")
+    
+    def warmup(self):
+        try:
+            dummy_image: np.ndarray = np.zeros((self.MODEL_IMGSZ[0], self.MODEL_IMGSZ[1], 3), dtype=np.uint8)
+            self.logger.info(f"Warming up Detector {self.name} with dummy image of size {self.MODEL_IMGSZ}")
+            for i in range(10):
+                self.model(dummy_image, device=self.device)
+                time.sleep(0.1)
+            self.logger.info(f"Detector {self.name} warmup completed successfully.")
+        except Exception as e:
+            self.logger.error(f"Error during warmup: {e} | {traceback.format_exc()}")
     
 
     def draw_detections_on_frame(self, frame: np.ndarray, detections: List[Dict[str, Any]]) -> np.ndarray:

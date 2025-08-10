@@ -1,10 +1,11 @@
 import os 
 import traceback
+from typing import Optional
 from Modules.CustomLogger import CustomLogger
 from Managers.ConfigManager import ConfigManager
 from Managers.CameraManager import CameraManager
-
-
+from classes.VLM import VLMProcessor
+from threading import Thread
 class DeviceManager:
     def __init__(self, name: str = "DeviceManager"):
         self.logger = CustomLogger(name)
@@ -19,6 +20,8 @@ class DeviceManager:
         self.logger.info("DeviceManager initialized.")
         self.running: bool = True
         self.camera_manager: CameraManager = CameraManager(name="CameraManager")
+        self.vlm_processor: VLMProcessor = VLMProcessor(name="VLMProcessor")
+        self.vlm_thread: Optional[Thread] = Thread(target=self.vlm_processor.start, name="VLMProcessorThread")
 
 
     def start(self):
@@ -28,5 +31,6 @@ class DeviceManager:
         try:
             self.logger.info("Starting DeviceManager.")
             self.camera_manager.start()
+            self.vlm_thread.start()
         except Exception as e:
             self.logger.error(f"Error starting DeviceManager: {e} | {traceback.format_exc()}")

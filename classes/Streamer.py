@@ -21,6 +21,7 @@ import time
 import traceback
 from typing import Union, Dict, Any, Optional
 import cv2
+from ffmpegcv import VideoCaptureStream
 from Managers.ConfigManager import ConfigManager
 from Modules.CustomLogger import CustomLogger
 from queue import Queue
@@ -74,12 +75,13 @@ class Streamer:
                 log_level=self.settings_manager.get("LOG_LEVEL"),
                 log_to_console=self.settings_manager.get("LOG_TO_CONSOLE"),
             )
+            self.USE_FFMPEG: bool = self.settings_manager.get("USE_FFMPEG", True)
             self.logger.info(f"Streamer {self.name} initialized with settings: {self.settings_manager.defaults}")
             
-            self.stream: cv2.VideoCapture = cv2.VideoCapture(camera_url)
-            self.height: int = int(self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.width: int = int(self.stream.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.fps: int = int(self.stream.get(cv2.CAP_PROP_FPS))
+            self.stream = VideoCaptureStream(camera_url) if self.USE_FFMPEG else cv2.VideoCapture(camera_url)
+            # self.height: int = int(self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            # self.width: int = int(self.stream.get(cv2.CAP_PROP_FRAME_WIDTH))
+            # self.fps: int = int(self.stream.get(cv2.CAP_PROP_FPS))
             
             # Stream state tracking
             self.ret_false_count: int = 0
@@ -181,9 +183,9 @@ class Streamer:
             time.sleep(3)
             camera_url: Union[str, int] = self.settings_manager.get("CAMERA_URL", 0)
             self.stream = cv2.VideoCapture(camera_url)
-            self.height = int(self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.width = int(self.stream.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.fps = int(self.stream.get(cv2.CAP_PROP_FPS))
+            # self.height = int(self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            # self.width = int(self.stream.get(cv2.CAP_PROP_FRAME_WIDTH))
+            # self.fps = int(self.stream.get(cv2.CAP_PROP_FPS))
             self.ret_false_count = 0
             self.frame_count = 0
             self.logger.info("Stream restarted successfully")
@@ -241,9 +243,9 @@ class Streamer:
         self.logger.info("*" * 20)
         self.logger.info(f"Streamer Name: {self.name}")
         self.logger.info(f"Camera URL: {self.settings_manager.get('CAMERA_URL', 0)}")
-        self.logger.info(f"Height: {self.height}")
-        self.logger.info(f"Width: {self.width}")
-        self.logger.info(f"FPS: {self.fps}")
+        # self.logger.info(f"Height: {self.height}")
+        # self.logger.info(f"Width: {self.width}")
+        # self.logger.info(f"FPS: {self.fps}")
         self.logger.info(f"Frame Count: {self.frame_count}")
         self.logger.info(f"Is Live: {self.is_live}")
         self.logger.info(f"Max Ret False Count: {self.max_ret_false_count}")
@@ -305,6 +307,5 @@ class Streamer:
         """
         camera_url: Union[str, int] = self.settings_manager.get('CAMERA_URL', 0)
         return (f"Streamer(name={self.name}, camera_url={camera_url}, "
-                f"height={self.height}, width={self.width}, fps={self.fps}, "
                 f"frame_count={self.frame_count}, is_live={self.is_live}, "
                 f"max_ret_false_count={self.max_ret_false_count}, running={self.running})")
