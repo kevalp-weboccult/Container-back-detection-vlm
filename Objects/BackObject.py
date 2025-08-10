@@ -68,6 +68,8 @@ class BackObject:
             self.best_bbox: Optional[List[float]] = None
             self.best_frame: Optional[np.ndarray] = None
             self.best_frame_size: Optional[Tuple[int, int]] = None
+            self.missing_count:int = 0
+            self.MIN_IMAGE_SIZE: int = self.config_manager.get("MIN_IMAGE_SIZE", 100)
             
         except Exception as e:
             print(f"Error initializing BackObject: {e} | {traceback.format_exc()}")
@@ -94,11 +96,22 @@ class BackObject:
             
             frame_size: Tuple[int, int] = (frame.shape[0], frame.shape[1])
             
-            if self.best_conf is None or conf > self.best_conf:
+            is_valid_size = (frame_size[0] > self.MIN_IMAGE_SIZE and 
+                           frame_size[1] > self.MIN_IMAGE_SIZE and 
+                           frame_size[0] < frame_size[1] * 1.5)
+            
+            should_update = (self.best_frame is None or 
+                           (conf > self.best_conf and 
+                            frame_size[0] > self.best_frame_size[0] and 
+                            frame_size[1] > self.best_frame_size[1]))
+            
+            if is_valid_size and should_update:
+                self.best_frame = frame
+                self.best_frame_size = frame_size
                 self.best_conf = conf
                 self.best_bbox = bbox
-                self.best_frame = frame.copy()
-                self.best_frame_size = frame_size
-
+                    
+                    
+            
         except Exception as e:
             self.logger.error(f"Error updating BackObject: {e} | {traceback.format_exc()}")

@@ -146,6 +146,8 @@ class CameraObject:
             self.logger.info(f"CameraObject {self.name} started successfully.")
             self.back_manager_thread = Thread(target=self.back_manager.start, name=f"{self.name}_back_manager_thread", daemon=True,args=(self.writer_queue,))
             self.back_manager_thread.start()
+            # self.vlm_processing_thread = Thread(target=self.back_manager.vlm_processing, name=f"{self.name}_vlm_processing_thread", daemon=True)
+            # self.vlm_processing_thread.start()
                   
         except Exception as e:
             self.logger.error(f"Error starting CameraObject {self.name}: {e} | {traceback.format_exc()}")
