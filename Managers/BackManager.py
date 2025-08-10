@@ -7,6 +7,9 @@ from Modules.CustomLogger import CustomLogger
 from Managers.ConfigManager import ConfigManager
 from Objects.BackObject import BackObject
 import cv2
+from queue import Queue
+from threading import Thread
+from datetime import datetime, timezone
 
 class BackManager:
     def __init__(self, name: str = "back_manager") -> None:
@@ -30,9 +33,14 @@ class BackManager:
             self.current_backs: List[int] = []
             self.reader_queue: Optional[Queue[Dict[str, Any]]] = None
             self.running: bool = True
+            self.missing_count: int = 10
+            self.vlm_processing_queue:Queue[BackObject] = Queue(maxsize=-1)
+            self.Capture_save_folder = self.config_manager.get("Capture_save_folder", "Processed_Images")
+            if not os.path.exists(self.Capture_save_folder):
+                os.makedirs(self.Capture_save_folder)
         except Exception as e:
             print(f"Error initializing BackManager: {e} | {traceback.format_exc()}")
-        
+    
     
     def start(self,reader_queue: Optional[Queue[Dict[str, Any]]] = None):
         """
@@ -40,6 +48,8 @@ class BackManager:
         """
         self.reader_queue = reader_queue
         self.logger.info(f"Starting BackManager {self.name}.")
+        self.logger.info("VLM processing thread started.")
+        
         while self.running:
             try:
                 self.current_backs = []
@@ -60,7 +70,7 @@ class BackManager:
 
                 for idx,bbox in enumerate(bboxes):
                     if ids[idx] not in self.all_tracked_backs:
-                        self.all_tracked_backs[ids[idx]] = BackObject(name=f"back_object_{ids[idx]}", id=ids[idx])
+                        self.all_tracked_backs[ids[idx]] = BackObject(id=ids[idx])
                         self.logger.info(f"Created new BackObject for ID {ids[idx]}.")
                     self.all_tracked_backs[ids[idx]].update(bbox, conf[idx], frame)
                 
@@ -76,8 +86,11 @@ class BackManager:
                 self.logger.info(f"Processed frame {frame_count} with {len(bboxes)} detections.")
                 for id in list(self.all_tracked_backs.keys()):
                     if id not in ids:
-                        # self.logger.info(f"Removing BackObject with ID {id} as it is no longer detected.")
-                        # del self.all_tracked_backs[id]
+                        self.all_tracked_backs[id].missing_count += 1
+                        if self.all_tracked_backs[id].missing_count > self.missing_count:
+                            self.logger.info(f"Removing BackObject with ID {id} as it is no longer detected.")
+                            self.vlm_processing_queue.put(self.all_tracked_backs[id])
+                            del self.all_tracked_backs[id]
                 # You can add code to save or display the frame here if needed
                 
 
@@ -88,3 +101,23 @@ class BackManager:
                 # For example, you might want to start a thread to monitor back objects
             except Exception as e:
                 self.logger.error(f"Error starting BackManager: {e} | {traceback.format_exc()}")
+    
+    def vlm_processing(self):
+        """
+        Thread to process BackObjects for VLM (Vision Language Model) processing.
+        """
+        while self.running:
+            try:
+                if not self.vlm_processing_queue.empty():
+                    back_object = self.vlm_processing_queue.get()
+                    # Process the back object with VLM
+                    self.logger.info(f"Processing BackObject {back_object.id} for VLM.")
+                    best_frame = back_object.best_frame
+                    if best_frame is not None:
+                        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        image_save_path  = os.path.join(self.Capture_save_folder, f"{current_time}.jpg")
+                        cv2.imwrite(image_save_path, best_frame)    
+                        
+                    # Add your VLM processing logic here
+            except Exception as e:
+                self.logger.error(f"Error in VLM processing thread: {e} | {traceback.format_exc()}")
